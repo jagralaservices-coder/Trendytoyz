@@ -2,22 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../db');
 
-const backupDir = process.env.BACKUP_DIR
-  ? path.resolve(process.env.BACKUP_DIR)
-  : path.resolve(__dirname, '../../data/backups');
-
-if (!fs.existsSync(backupDir)) {
-  fs.mkdirSync(backupDir, { recursive: true });
-}
+const { getDatabasePath, getBackupDir } = require('../storageConfig');
+const backupDir = getBackupDir();
 
 /**
  * Creates a physical timestamped SQLite snapshot
  */
 function createDatabaseBackup(customLabel = '') {
   try {
-    const dbPath = process.env.DATABASE_PATH
-      ? path.resolve(process.env.DATABASE_PATH)
-      : path.resolve(__dirname, '../../data/database.sqlite');
+    const dbPath = getDatabasePath();
 
     if (!fs.existsSync(dbPath)) {
       throw new Error(`Database file not found at: ${dbPath}`);

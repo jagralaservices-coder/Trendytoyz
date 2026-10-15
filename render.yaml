@@ -2,23 +2,19 @@ services:
   - type: web
     name: trendytoyz-backend
     env: node
-    plan: starter
+    plan: free
     buildCommand: npm install
     startCommand: npm start
     autoDeploy: true
-    disk:
-      name: trendytoyz-data
-      mountPath: /data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_PATH
-        value: /data/database.sqlite
+        value: ./data/database.sqlite
       - key: UPLOADS_DIR
-        value: /data/uploads
+        value: ./data/uploads
       - key: BACKUP_DIR
-        value: /data/backups
+        value: ./data/backups
       - key: CLIENT_URL
         value: https://trendytoyz.vercel.app
       - key: JWT_SECRET

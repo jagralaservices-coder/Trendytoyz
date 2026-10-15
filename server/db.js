@@ -4,24 +4,21 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-// Determine persistent database location outside watched server directory
-const dbPath = process.env.DATABASE_PATH
-  ? path.resolve(process.env.DATABASE_PATH)
-  : path.resolve(__dirname, '../data/database.sqlite');
-
-// Ensure database directory exists
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
+// Determine persistent database location safely
+const { getDatabasePath } = require('./storageConfig');
+const dbPath = getDatabasePath();
 
 // Auto-migrate legacy server/database.sqlite to data/database.sqlite if needed
 const legacyDbPath = path.join(__dirname, 'database.sqlite');
 if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
-  console.log(`[Data Persistence] Migrating database from legacy ${legacyDbPath} to ${dbPath}...`);
-  fs.copyFileSync(legacyDbPath, dbPath);
-  if (fs.existsSync(legacyDbPath + '-wal')) fs.copyFileSync(legacyDbPath + '-wal', dbPath + '-wal');
-  if (fs.existsSync(legacyDbPath + '-shm')) fs.copyFileSync(legacyDbPath + '-shm', dbPath + '-shm');
+  try {
+    console.log(`[Data Persistence] Migrating database from legacy ${legacyDbPath} to ${dbPath}...`);
+    fs.copyFileSync(legacyDbPath, dbPath);
+    if (fs.existsSync(legacyDbPath + '-wal')) fs.copyFileSync(legacyDbPath + '-wal', dbPath + '-wal');
+    if (fs.existsSync(legacyDbPath + '-shm')) fs.copyFileSync(legacyDbPath + '-shm', dbPath + '-shm');
+  } catch (err) {
+    console.warn(`[Data Persistence] Legacy migration warning:`, err.message);
+  }
 }
 
 const db = new Database(dbPath);

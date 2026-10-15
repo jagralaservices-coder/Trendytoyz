@@ -6,14 +6,9 @@ const multer = require('multer');
 const db = require('../db');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 
-// Ensure persistent uploads directory exists outside watched server directory
-const uploadsDir = process.env.UPLOADS_DIR
-  ? path.resolve(process.env.UPLOADS_DIR)
-  : path.resolve(__dirname, '../../data/uploads');
-
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Ensure persistent uploads directory exists safely
+const { getUploadsDir } = require('../storageConfig');
+const uploadsDir = getUploadsDir();
 
 // Multer disk storage configuration
 const storage = multer.diskStorage({

@@ -1,6 +1,13 @@
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] Unhandled Rejection:', reason);
+});
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -49,18 +56,20 @@ app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static uploads folders (Persistent storage outside server directory)
-const fs = require('fs');
-const uploadsDir = process.env.UPLOADS_DIR
-  ? path.resolve(process.env.UPLOADS_DIR)
-  : path.resolve(__dirname, '../data/uploads');
-
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Static uploads folders (Persistent storage safe resolution)
+const { getUploadsDir } = require('./storageConfig');
+const uploadsDir = getUploadsDir();
 
 app.use('/uploads', express.static(uploadsDir));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Health check routes for Render / uptime monitoring
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
+});
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
