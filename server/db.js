@@ -428,6 +428,62 @@ function seedInitialData() {
     console.log('[Seed] Default couriers seeded successfully.');
   }
 
+  // Seed Catalog (Categories, Products & Images): ONLY if categories table is empty
+  const catCount = db.prepare('SELECT count(*) as count FROM categories').get().count;
+  if (catCount === 0) {
+    try {
+      const seedFile = path.join(__dirname, 'defaultSeed.json');
+      if (fs.existsSync(seedFile)) {
+        const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
+
+        if (Array.isArray(seedData.categories)) {
+          const insertCat = db.prepare(`
+            INSERT OR IGNORE INTO categories (id, name, slug, description, image, is_active, display_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `);
+          seedData.categories.forEach(c => {
+            insertCat.run(c.id, c.name, c.slug, c.description || '', c.image || '', c.is_active ?? 1, c.display_order || 0);
+          });
+        }
+
+        if (Array.isArray(seedData.products)) {
+          const insertProd = db.prepare(`
+            INSERT OR IGNORE INTO products (
+              id, name, slug, sku, category_id, subcategory, brand, description, short_description,
+              key_features, mrp, selling_price, purchase_cost, gst_percent, stock_quantity,
+              low_stock_threshold, weight, dimensions, is_cod_available, is_online_available,
+              is_featured, is_best_seller, is_new_arrival, status, age_group, tags, is_free_shipping, shipping_charge
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          seedData.products.forEach(p => {
+            insertProd.run(
+              p.id, p.name, p.slug, p.sku, p.category_id, p.subcategory || '', p.brand || 'TRENDYTOYZ',
+              p.description || '', p.short_description || '', p.key_features || '', p.mrp, p.selling_price,
+              p.purchase_cost || 0, p.gst_percent || 18, p.stock_quantity || 50, p.low_stock_threshold || 5,
+              p.weight || 0.5, p.dimensions || '', p.is_cod_available ?? 1, p.is_online_available ?? 1,
+              p.is_featured || 0, p.is_best_seller || 0, p.is_new_arrival || 0, p.status || 'active',
+              p.age_group || 'All Ages', p.tags || '', p.is_free_shipping ?? 1, p.shipping_charge || 0
+            );
+          });
+        }
+
+        if (Array.isArray(seedData.images)) {
+          const insertImg = db.prepare(`
+            INSERT OR IGNORE INTO product_images (id, product_id, image_url, is_primary, display_order)
+            VALUES (?, ?, ?, ?, ?)
+          `);
+          seedData.images.forEach(img => {
+            insertImg.run(img.id, img.product_id, img.image_url, img.is_primary || 0, img.display_order || 0);
+          });
+        }
+
+        console.log(`[Seed] Initial catalog seeded: ${seedData.categories.length} categories, ${seedData.products.length} products.`);
+      }
+    } catch (catSeedErr) {
+      console.warn('[Seed Warning] Could not seed default catalog:', catSeedErr.message);
+    }
+  }
+
   // Seed Settings: STRICTLY INSERT OR IGNORE. NEVER OVERWRITE SAVED ADMIN SETTINGS!
   const defaultSettings = [
     { key: 'brand_name', value: 'TRENDYTOYZ' },

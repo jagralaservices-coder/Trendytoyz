@@ -4,11 +4,11 @@
   "rewrites": [
     {
       "source": "/api/:match*",
-      "destination": "https://trendytoyz-backend.onrender.com/api/:match*"
+      "destination": "https://trendytoyzz.onrender.com/api/:match*"
     },
     {
       "source": "/uploads/:match*",
-      "destination": "https://trendytoyz-backend.onrender.com/uploads/:match*"
+      "destination": "https://trendytoyzz.onrender.com/uploads/:match*"
     },
     {
       "source": "/(.*)",
