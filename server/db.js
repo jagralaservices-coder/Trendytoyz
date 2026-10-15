@@ -21,11 +21,54 @@ if (!fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
   }
 }
 
-const db = new Database(dbPath);
+let db = null;
+let dbStatus = 'connecting';
+let dbError = null;
 
-// Enable WAL mode for high performance concurrency & enforce relational integrity
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+const dbProxy = new Proxy({}, {
+  get(target, prop) {
+    if (prop === 'getDbStatus') {
+      return () => ({ status: dbStatus, error: dbError, path: dbPath });
+    }
+    if (prop === 'connectDb') {
+      return connectDb;
+    }
+    if (prop === 'getRawDb') {
+      return () => db;
+    }
+    if (!db) {
+      if (typeof prop === 'string' && ['prepare', 'exec', 'pragma', 'transaction', 'backup'].includes(prop)) {
+        return function() {
+          throw new Error(`Database unavailable (${dbStatus}: ${dbError || 'connecting'}). Retrying in background...`);
+        };
+      }
+      return undefined;
+    }
+    const val = db[prop];
+    return typeof val === 'function' ? val.bind(db) : val;
+  }
+});
+
+function connectDb() {
+  try {
+    console.log(`Connecting SQLite Database at: ${dbPath}`);
+    db = new Database(dbPath);
+    // Enable WAL mode for high performance concurrency & enforce relational integrity
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+    initDb();
+    logDataIntegrityCheck();
+    dbStatus = 'connected';
+    dbError = null;
+    return true;
+  } catch (err) {
+    dbStatus = 'error';
+    dbError = err.message;
+    console.error(`[Database Error] SQLite initialization failed (${err.message}). Server remains alive and will retry in 5s.`);
+    setTimeout(connectDb, 5000);
+    return false;
+  }
+}
 
 function initDb() {
   console.log(`Initializing SQLite Database at: ${dbPath}`);
@@ -486,6 +529,6 @@ function logDataIntegrityCheck() {
   }
 }
 
-initDb();
+connectDb();
 
-module.exports = db;
+module.exports = dbProxy;

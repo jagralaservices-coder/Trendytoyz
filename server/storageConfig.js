@@ -1,84 +1,159 @@
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
+// Global fallback to OS temp directory which is guaranteed writable on any Linux/Render container
+const TMP_FALLBACK_BASE = path.join(os.tmpdir(), 'trendytoyz');
+
 /**
- * Ensures a directory exists and is writable.
- * If preferredDir is not writable or cannot be created, falls back to safe local workspace path.
+ * Safely creates a directory if it doesn't exist and verifies write access.
+ * Returns true if writable, false otherwise (without throwing).
  */
-function ensureWritableDir(preferredDir, fallbackRelativePath) {
-  const projectRoot = path.resolve(__dirname, '..');
-  const fallbackDir = path.resolve(projectRoot, fallbackRelativePath);
-
-  if (preferredDir) {
-    try {
-      const resolved = path.resolve(preferredDir);
-      if (!fs.existsSync(resolved)) {
-        fs.mkdirSync(resolved, { recursive: true });
-      }
-      fs.accessSync(resolved, fs.constants.W_OK);
-      return resolved;
-    } catch (err) {
-      console.warn(`[Storage Fallback] Cannot use "${preferredDir}" (${err.message}). Using safe workspace directory: "${fallbackDir}"`);
-    }
-  }
-
+function safeEnsureDir(targetDir) {
   try {
-    if (!fs.existsSync(fallbackDir)) {
-      fs.mkdirSync(fallbackDir, { recursive: true });
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
     }
-    return fallbackDir;
+    fs.accessSync(targetDir, fs.constants.W_OK);
+    return true;
   } catch (err) {
-    console.error(`[Storage Error] Could not create fallback directory "${fallbackDir}":`, err.message);
-    const tmpDir = path.resolve(__dirname, '../data');
-    if (!fs.existsSync(tmpDir)) {
-      try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (e) {}
-    }
-    return tmpDir;
+    console.warn(`[Storage Warning] Cannot write to directory "${targetDir}": ${err.message}`);
+    return false;
   }
 }
 
 /**
- * Resolves the database file path safely.
+ * Determines a guaranteed writable base directory.
+ * Priority:
+ * 1. process.env.STORAGE_DIR (if set and writable)
+ * 2. Project-root ./data (if writable)
+ * 3. os.tmpdir()/trendytoyz (guaranteed writable fallback)
+ */
+function getBaseStorageDir() {
+  if (process.env.STORAGE_DIR) {
+    const custom = path.resolve(process.env.STORAGE_DIR);
+    if (safeEnsureDir(custom)) return custom;
+  }
+
+  const projectLocal = path.resolve(__dirname, '../data');
+  if (safeEnsureDir(projectLocal)) {
+    return projectLocal;
+  }
+
+  // OS temp fallback (Render free tier friendly)
+  safeEnsureDir(TMP_FALLBACK_BASE);
+  return TMP_FALLBACK_BASE;
+}
+
+/**
+ * Safely resolves a subfolder or returns guaranteed safe fallback.
+ */
+function ensureWritableDir(preferredDir, fallbackSubdir) {
+  if (preferredDir) {
+    const resolved = path.resolve(preferredDir);
+    if (safeEnsureDir(resolved)) return resolved;
+  }
+
+  const base = getBaseStorageDir();
+  const target = path.join(base, fallbackSubdir || '');
+  if (safeEnsureDir(target)) return target;
+
+  const tempTarget = path.join(TMP_FALLBACK_BASE, fallbackSubdir || '');
+  safeEnsureDir(tempTarget);
+  return tempTarget;
+}
+
+/**
+ * Resolves SQLite database path safely.
  */
 function getDatabasePath() {
-  const fallbackDir = ensureWritableDir(null, 'data');
-  const fallbackDbPath = path.join(fallbackDir, 'database.sqlite');
-
   if (process.env.DATABASE_PATH) {
-    try {
-      const resolved = path.resolve(process.env.DATABASE_PATH);
-      const dir = path.dirname(resolved);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.accessSync(dir, fs.constants.W_OK);
-      return resolved;
-    } catch (err) {
-      console.warn(`[Storage Fallback] Cannot use DATABASE_PATH="${process.env.DATABASE_PATH}" (${err.message}). Falling back to: "${fallbackDbPath}"`);
-      return fallbackDbPath;
-    }
+    const resolved = path.resolve(process.env.DATABASE_PATH);
+    const dir = path.dirname(resolved);
+    if (safeEnsureDir(dir)) return resolved;
+    console.warn(`[Storage] DATABASE_PATH directory not writable. Falling back to safe database path.`);
   }
 
-  return fallbackDbPath;
+  const baseDir = getBaseStorageDir();
+  return path.join(baseDir, 'database.sqlite');
 }
 
 /**
- * Resolves the uploads directory safely.
+ * Resolves uploads directory safely.
  */
 function getUploadsDir() {
-  return ensureWritableDir(process.env.UPLOADS_DIR, 'data/uploads');
+  return ensureWritableDir(process.env.UPLOADS_DIR, 'uploads');
 }
 
 /**
- * Resolves the backups directory safely.
+ * Resolves backups directory safely.
  */
 function getBackupDir() {
-  return ensureWritableDir(process.env.BACKUP_DIR, 'data/backups');
+  return ensureWritableDir(process.env.BACKUP_DIR, 'backups');
+}
+
+/**
+ * Cloudinary configuration & upload helper
+ */
+let cloudinary = null;
+try {
+  cloudinary = require('cloudinary').v2;
+  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true
+    });
+  }
+} catch (e) {
+  // Cloudinary module not loaded
+}
+
+function isCloudinaryConfigured() {
+  return !!(
+    cloudinary &&
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  );
+}
+
+/**
+ * Uploads a file buffer directly to Cloudinary
+ */
+async function uploadToCloudinary(fileBuffer, originalName = 'upload') {
+  if (!isCloudinaryConfigured()) {
+    throw new Error('Cloudinary is not configured on this server.');
+  }
+
+  return new Promise((resolve, reject) => {
+    const cleanPublicId = path.basename(originalName, path.extname(originalName))
+      .replace(/[^a-zA-Z0-9]/g, '-')
+      .slice(0, 30);
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'trendytoyz/products',
+        public_id: `${cleanPublicId}-${Date.now()}`,
+        resource_type: 'image'
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+
+    uploadStream.end(fileBuffer);
+  });
 }
 
 module.exports = {
+  getBaseStorageDir,
   getDatabasePath,
   getUploadsDir,
   getBackupDir,
-  ensureWritableDir
+  ensureWritableDir,
+  isCloudinaryConfigured,
+  uploadToCloudinary
 };

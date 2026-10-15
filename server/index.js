@@ -17,7 +17,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Initialize Database
-require('./db');
+const db = require('./db');
 
 // CORS Configuration (Allow Vercel frontend, custom domains, and local dev)
 const allowedOrigins = [
@@ -51,7 +51,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -63,10 +62,43 @@ const uploadsDir = getUploadsDir();
 app.use('/uploads', express.static(uploadsDir));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Health check routes for Render / uptime monitoring
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+// Startup Environment Audit (Logs missing vars with sensible defaults instead of crashing)
+function auditEnvironment() {
+  const warnings = [];
+  if (!process.env.JWT_SECRET) {
+    warnings.push('JWT_SECRET is not set in environment. Using automatic fallback key (Sessions will invalidate on restart).');
+  }
+  if (!process.env.CLIENT_URL) {
+    warnings.push('CLIENT_URL not set. Defaulting to https://trendytoyz.vercel.app');
+  }
+  if (warnings.length > 0) {
+    console.log('⚠️  ENVIRONMENT CONFIGURATION NOTICE:');
+    warnings.forEach(w => console.log('   • ' + w));
+  }
+}
+auditEnvironment();
+
+// Health check routes for Render / Uptime Monitoring (Immediate 200 OK without auth)
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'trendytoyz-api',
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
 });
+
+app.get(['/health', '/api/health'], (req, res) => {
+  const dbStatus = typeof db.getDbStatus === 'function' ? db.getDbStatus() : { status: 'connected' };
+  res.status(200).json({
+    status: 'ok',
+    service: 'trendytoyz-api',
+    uptime: Math.round(process.uptime()),
+    db: dbStatus.status || 'connected',
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/healthz', (req, res) => {
   res.status(200).send('OK');
 });

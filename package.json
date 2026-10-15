@@ -10,6 +10,9 @@
     "build": "vite build",
     "start": "node server/index.js"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "keywords": [
     "ecommerce",
     "jgrlco",
@@ -24,6 +27,7 @@
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
     "canvas-confetti": "^1.9.4",
+    "cloudinary": "^2.11.0",
     "concurrently": "^10.0.5",
     "cors": "^2.8.6",
     "dotenv": "^18.0.5",
