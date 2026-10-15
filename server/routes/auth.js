@@ -90,7 +90,7 @@ router.post('/reset-password', (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const user = db.prepare('SELECT id, name, email, role FROM users WHERE LOWER(email) = ?').get(cleanEmail);
     if (!user) {
-      return res.status(404).json({ success: false, error: 'Is email se koi account register nahi hai.' });
+      return res.status(400).json({ success: false, error: 'Is email address se koi account nahi mila. Kripya pehle Sign Up / Register karein.' });
     }
 
     const hashedPassword = bcrypt.hashSync(newPassword, 10);
@@ -111,7 +111,7 @@ router.get('/me', authenticateToken, (req, res) => {
   try {
     const user = db.prepare('SELECT id, name, email, phone, role, status, created_at FROM users WHERE id = ?').get(req.user.id);
     if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found.' });
+      return res.status(401).json({ success: false, error: 'Session expired or user not found. Please sign in again.' });
     }
     res.json({ success: true, user });
   } catch (err) {

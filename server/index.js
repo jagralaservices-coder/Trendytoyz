@@ -61,6 +61,24 @@ const uploadsDir = getUploadsDir();
 
 app.use('/uploads', express.static(uploadsDir));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+
+// Fallback for missing uploads: Return valid SVG image instead of falling through to HTML SPA catch-all
+app.use('/uploads', (req, res) => {
+  res.status(200)
+    .setHeader('Content-Type', 'image/svg+xml')
+    .setHeader('Cache-Control', 'public, max-age=3600')
+    .send(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" fill="#f8fafc" rx="16"/>
+  <rect x="20" y="20" width="360" height="360" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-dasharray="6,6" rx="12"/>
+  <g transform="translate(160, 140)">
+    <circle cx="40" cy="40" r="36" fill="#e0f2fe"/>
+    <path d="M40 24v32M24 40h32" stroke="#0284c7" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <text x="200" y="245" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="800" fill="#0f172a" text-anchor="middle">TRENDYTOYZ</text>
+  <text x="200" y="270" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#64748b" text-anchor="middle">Product Image Preview</text>
+</svg>`);
+});
 
 // Startup Environment Audit (Logs missing vars with sensible defaults instead of crashing)
 function auditEnvironment() {

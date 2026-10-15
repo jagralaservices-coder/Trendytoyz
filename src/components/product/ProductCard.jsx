@@ -60,10 +60,14 @@ export default function ProductCard({ product }) {
       {/* Image Container */}
       <Link to={`/product/${product.slug}`} className="block relative aspect-square bg-slate-100 overflow-hidden">
         <img
-          src={product.primary_image}
+          src={product.primary_image || '/favicon.svg'}
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
           loading="lazy"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='18' fill='%2394a3b8'%3ETRENDYTOYZ%3C/text%3E%3C/svg%3E";
+          }}
         />
         {isOutOfStock && (
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center">

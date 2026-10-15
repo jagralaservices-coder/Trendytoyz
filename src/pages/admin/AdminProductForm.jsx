@@ -94,7 +94,7 @@ export default function AdminProductForm() {
     dimensions: '',
     is_free_shipping: false,
     shipping_charge: '49',
-    is_cod_available: false,
+    is_cod_available: true,
     is_online_available: true,
     amazon_url: '',
     flipkart_url: '',

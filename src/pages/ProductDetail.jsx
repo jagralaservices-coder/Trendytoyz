@@ -183,9 +183,13 @@ export default function ProductDetail() {
         <div className="space-y-4">
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden aspect-square relative shadow-sm">
             <img
-              src={selectedImage}
+              src={selectedImage || '/favicon.svg'}
               alt={product.name}
               className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-weight='bold' font-size='18' fill='%2394a3b8'%3ETRENDYTOYZ%3C/text%3E%3C/svg%3E";
+              }}
             />
             {product.discount_percent > 0 && (
               <span className="absolute top-4 left-4 bg-sky-600 text-white font-black text-xs px-3 py-1 rounded-full shadow-md">
@@ -205,7 +209,15 @@ export default function ProductDetail() {
                     selectedImage === img ? 'border-sky-600 scale-95 shadow-md' : 'border-slate-200 hover:border-slate-400'
                   }`}
                 >
-                  <img src={img} alt={`Thumb ${idx}`} className="w-full h-full object-cover" />
+                  <img
+                    src={img}
+                    alt={`Thumb ${idx}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='9' fill='%2394a3b8'%3ETOY%3C/text%3E%3C/svg%3E";
+                    }}
+                  />
                 </button>
               ))}
             </div>

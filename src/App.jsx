@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import MobileNav from './components/layout/MobileNav';
+import { getApiBase } from './services/api';
 
 // Customer Pages
 import Home from './pages/Home';
@@ -49,6 +50,21 @@ export default function App() {
   const isInvoiceRoute = location.pathname.startsWith('/invoice');
 
   const hideHeaderFooter = isAdminRoute || isInvoiceRoute;
+
+  // Background keepalive to wake up Render free tier backend instantly on page load
+  useEffect(() => {
+    try {
+      const base = getApiBase();
+      const ping = () => {
+        fetch(`${base}/health`, { method: 'GET' }).catch(() => {});
+      };
+      ping();
+      const interval = setInterval(ping, 7 * 60 * 1000); // Ping every 7 mins while active
+      return () => clearInterval(interval);
+    } catch (e) {
+      // Ignore background ping errors
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col justify-between">

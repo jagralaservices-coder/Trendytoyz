@@ -556,6 +556,13 @@ function seedInitialData() {
   for (const s of defaultSettings) {
     insertSetting.run(s.key, s.value);
   }
+
+  // Ensure active catalog products have Cash on Delivery available by default
+  try {
+    db.prepare("UPDATE products SET is_cod_available = 1 WHERE is_cod_available = 0 AND (is_deleted = 0 OR is_deleted IS NULL)").run();
+  } catch (e) {
+    // ignore
+  }
 }
 
 /**

@@ -329,6 +329,42 @@ router.post('/place-order', optionalAuth, async (req, res) => {
       pincode: customerPincode
     });
 
+    // Pre-flight Razorpay order creation for Online payments (fails fast if credentials are invalid or gateway down)
+    let razorpayOrderId = null;
+    let razorpayKey = null;
+    const amountInPaise = Math.round(totalAmount * 100);
+
+    if (paymentMethod === 'ONLINE') {
+      razorpayKey = process.env.RAZORPAY_KEY_ID || settings.razorpay_key_id;
+      const razorpaySecret = process.env.RAZORPAY_KEY_SECRET || settings.razorpay_key_secret;
+
+      if (!razorpayKey || !razorpaySecret) {
+        return res.status(400).json({
+          success: false,
+          error: 'Razorpay credentials configured nahi hain. Kripya Cash on Delivery (COD) choose karein ya Admin Settings mein Key ID & Secret update karein.'
+        });
+      }
+
+      try {
+        const Razorpay = require('razorpay');
+        const rzp = new Razorpay({ key_id: razorpayKey, key_secret: razorpaySecret });
+        const rzpOrder = await rzp.orders.create({
+          amount: amountInPaise,
+          currency: 'INR',
+          receipt: String(orderId).slice(0, 40)
+        });
+        razorpayOrderId = rzpOrder.id;
+        console.log(`[Razorpay] Created order ${razorpayOrderId} for store order #${orderId}`);
+      } catch (rzpErr) {
+        console.error('[Razorpay] Orders.create error:', rzpErr.message || rzpErr);
+        const reason = rzpErr.error?.description || rzpErr.message || 'Authentication failed';
+        return res.status(400).json({
+          success: false,
+          error: `Razorpay Payment Gateway error (${reason}). Aap Cash on Delivery (COD) select karke apna order complete kar sakte hain.`
+        });
+      }
+    }
+
     // Start DB Transaction for atomic order creation & stock deduction
     const createOrderTx = db.transaction(() => {
       // Insert Order
@@ -383,28 +419,6 @@ router.post('/place-order', optionalAuth, async (req, res) => {
         totalAmount
       });
     } else {
-      // Prepare Online Payment Gateway Payload (Razorpay Standard Web Checkout)
-      const razorpayKey = process.env.RAZORPAY_KEY_ID || settings.razorpay_key_id;
-      const razorpaySecret = process.env.RAZORPAY_KEY_SECRET || settings.razorpay_key_secret;
-      const amountInPaise = Math.round(totalAmount * 100);
-
-      let razorpayOrderId = null;
-      if (razorpayKey && razorpaySecret) {
-        try {
-          const Razorpay = require('razorpay');
-          const rzp = new Razorpay({ key_id: razorpayKey, key_secret: razorpaySecret });
-          const rzpOrder = await rzp.orders.create({
-            amount: amountInPaise,
-            currency: 'INR',
-            receipt: String(orderId).slice(0, 40)
-          });
-          razorpayOrderId = rzpOrder.id;
-          console.log(`[Razorpay] Created order ${razorpayOrderId} for store order #${orderId}`);
-        } catch (rzpErr) {
-          console.error('[Razorpay] Orders.create error:', rzpErr.message || rzpErr);
-        }
-      }
-
       res.json({
         success: true,
         orderId,

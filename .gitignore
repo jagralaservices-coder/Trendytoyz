@@ -27,9 +27,7 @@ data/*.sqlite-shm
 *.sqlite-wal
 *.sqlite-shm
 
-# Uploads & Backups
-server/uploads/
-uploads/
+# Uploads & Backups (Preserve catalog images in repo, ignore runtime data caches)
 data/uploads/
 data/backups/
 
