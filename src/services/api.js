@@ -1,6 +1,18 @@
 // API client wrapper for TRENDYTOYZ frontend
 
-const API_BASE = '/api';
+function getApiBase() {
+  if (typeof window === 'undefined') return '/api';
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  // If served directly from Express backend port 5000
+  if (window.location.port === '5000') return '/api';
+  // If served from Vite dev server port 3000
+  if (window.location.port === '3000') return '/api';
+  // If running on other local ports (5173, 4173, 5500, etc.) without proxy
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return `http://${window.location.hostname}:5000/api`;
+  }
+  return '/api';
+}
 
 export function getAuthToken() {
   return localStorage.getItem('jgrl_token') || '';
@@ -18,14 +30,39 @@ export async function apiRequest(endpoint, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
+  const base = getApiBase();
+  const primaryUrl = `${base}${endpoint}`;
+
   let response;
   try {
-    response = await fetch(`${API_BASE}${endpoint}`, {
+    response = await fetch(primaryUrl, {
       ...options,
       headers
     });
+    // If primary returned 404 (e.g. dev server without API proxy or proxy hiccup), try direct port 5000 fallback
+    if (response.status === 404 && typeof window !== 'undefined' && !primaryUrl.includes(':5000')) {
+      const fallbackUrl = `http://${window.location.hostname || '127.0.0.1'}:5000/api${endpoint}`;
+      try {
+        const fallbackRes = await fetch(fallbackUrl, { ...options, headers });
+        if (fallbackRes.ok || fallbackRes.status !== 404) {
+          response = fallbackRes;
+        }
+      } catch (fallbackErr) {
+        // Keep primary response
+      }
+    }
   } catch (networkErr) {
-    throw new Error('Server se connection nahi ho pa raha hai. Kripya check karein ki backend server running hai.');
+    // If network error and not already using port 5000, try direct 5000 fallback
+    if (typeof window !== 'undefined' && !primaryUrl.includes(':5000')) {
+      try {
+        const fallbackUrl = `http://${window.location.hostname || '127.0.0.1'}:5000/api${endpoint}`;
+        response = await fetch(fallbackUrl, { ...options, headers });
+      } catch (fallbackErr) {
+        throw new Error('Server connection error. Please ensure backend server on port 5000 is running.');
+      }
+    } else {
+      throw new Error('Server connection error. Please ensure backend server on port 5000 is running.');
+    }
   }
 
   let data;
