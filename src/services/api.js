@@ -18,14 +18,38 @@ export async function apiRequest(endpoint, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers
+    });
+  } catch (networkErr) {
+    throw new Error('Server se connection nahi ho pa raha hai. Kripya check karein ki backend server running hai.');
+  }
 
-  const data = await response.json();
+  let data;
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      data = { success: false, error: 'Invalid response format from server.' };
+    }
+  } else {
+    const rawText = await response.text();
+    try {
+      data = JSON.parse(rawText);
+    } catch (e) {
+      if (!response.ok) {
+        throw new Error(`Server error (${response.status}): Kripya thodi der baad dobara try karein.`);
+      }
+      data = { success: false, error: rawText || 'Unexpected server response.' };
+    }
+  }
+
   if (!response.ok) {
-    throw new Error(data.error || 'API Request failed');
+    throw new Error(data.error || `Request failed with status ${response.status}`);
   }
   return data;
 }
@@ -34,6 +58,7 @@ export const api = {
   // Auth
   register: (body) => apiRequest('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (body) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  resetPassword: (body) => apiRequest('/auth/reset-password', { method: 'POST', body: JSON.stringify(body) }),
   googleLogin: (body) => apiRequest('/auth/google', { method: 'POST', body: JSON.stringify(body) }),
   appleLogin: (body) => apiRequest('/auth/apple', { method: 'POST', body: JSON.stringify(body) }),
   getProfile: () => apiRequest('/auth/me'),

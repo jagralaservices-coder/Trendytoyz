@@ -13,18 +13,22 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ success: false, error: 'Name, email and password are required.' });
     }
 
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+    const cleanPhone = phone ? phone.trim() : '';
+
+    const existing = db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(cleanEmail);
     if (existing) {
-      return res.status(400).json({ success: false, error: 'Account with this email already exists.' });
+      return res.status(400).json({ success: false, error: 'Yeh email address pehle se registered hai. Kripya login karein.' });
     }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
     const result = db.prepare(`
       INSERT INTO users (name, email, phone, password, role, status)
       VALUES (?, ?, ?, ?, 'customer', 'active')
-    `).run(name, email, phone || '', hashedPassword);
+    `).run(cleanName, cleanEmail, cleanPhone, hashedPassword);
 
-    const user = { id: result.lastInsertRowid, name, email, role: 'customer' };
+    const user = { id: result.lastInsertRowid, name: cleanName, email: cleanEmail, role: 'customer' };
     const token = jwt.sign(user, JWT_SECRET, { expiresIn: '7d' });
 
     res.json({ success: true, token, user });
@@ -42,9 +46,10 @@ router.post('/login', (req, res) => {
       return res.status(400).json({ success: false, error: 'Email and password are required.' });
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const cleanEmail = email.trim().toLowerCase();
+    const user = db.prepare('SELECT * FROM users WHERE LOWER(email) = ?').get(cleanEmail);
     if (!user) {
-      return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+      return res.status(401).json({ success: false, error: 'Email ya password galat hai.' });
     }
 
     if (user.status === 'blocked') {
@@ -58,7 +63,7 @@ router.post('/login', (req, res) => {
 
     const isMatch = bcrypt.compareSync(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+      return res.status(401).json({ success: false, error: 'Email ya password galat hai.' });
     }
 
     const userData = { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role };
@@ -68,6 +73,36 @@ router.post('/login', (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ success: false, error: 'Server error during login.' });
+  }
+});
+
+// Reset / Forgot Password
+router.post('/reset-password', (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Email aur naya password daalna zaroori hai.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, error: 'Password kam se kam 6 characters ka hona chahiye.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = db.prepare('SELECT id, name, email, role FROM users WHERE LOWER(email) = ?').get(cleanEmail);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Is email se koi account register nahi hai.' });
+    }
+
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashedPassword, user.id);
+
+    const userData = { id: user.id, name: user.name, email: user.email, role: user.role };
+    const token = jwt.sign(userData, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({ success: true, message: 'Password safaltapoorvak badal gaya hai.', token, user: userData });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ success: false, error: 'Server error updating password.' });
   }
 });
 

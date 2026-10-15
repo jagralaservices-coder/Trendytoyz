@@ -59,9 +59,22 @@ export default function Register() {
         )}
 
         {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3.5 rounded-xl text-xs font-semibold space-y-1.5">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+            {(error.toLowerCase().includes('already exists') || error.toLowerCase().includes('pehle se')) && (
+              <div className="pt-1 border-t border-rose-200/60 flex items-center justify-between text-slate-800 font-bold">
+                <span>Account pehle se bana hua hai?</span>
+                <Link
+                  to={isFromCheckout ? `/account/login?redirect=${encodeURIComponent(redirect)}` : '/account/login'}
+                  className="text-sky-600 hover:underline flex items-center gap-1"
+                >
+                  Direct Login Karein →
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
