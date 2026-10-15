@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import AdminSidebar from '../../components/admin/AdminSidebar';
 import AdminHeader from '../../components/admin/AdminHeader';
-import { api } from '../../services/api';
+import { api, getApiBase } from '../../services/api';
 
 export default function AdminSettings() {
   const logoFileInputRef = useRef(null);
@@ -180,7 +180,7 @@ export default function AdminSettings() {
   const handleExportJSON = async () => {
     try {
       const token = localStorage.getItem('jgrl_token') || '';
-      const response = await fetch('/api/backup/export', {
+      const response = await fetch(`${getApiBase()}/backup/export`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Failed to generate export backup');

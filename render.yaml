@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: trendytoyz-backend
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    disk:
+      name: trendytoyz-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /data/database.sqlite
+      - key: UPLOADS_DIR
+        value: /data/uploads
+      - key: BACKUP_DIR
+        value: /data/backups
+      - key: CLIENT_URL
+        value: https://trendytoyz.vercel.app
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_EMAIL
+        value: trendytoys.info@gmail.com
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false

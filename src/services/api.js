@@ -1,16 +1,33 @@
 // API client wrapper for TRENDYTOYZ frontend
 
-function getApiBase() {
+export function getApiBase() {
   if (typeof window === 'undefined') return '/api';
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-  // If served directly from Express backend port 5000
-  if (window.location.port === '5000') return '/api';
-  // If served from Vite dev server port 3000
-  if (window.location.port === '3000') return '/api';
-  // If running on other local ports (5173, 4173, 5500, etc.) without proxy
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+
+  // 1. Prioritize environment variable if set
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
+    let clean = envUrl.trim().replace(/\/+$/, '');
+    // Upgrade http to https when frontend is served over https to prevent Mixed Content
+    if (window.location.protocol === 'https:' && clean.startsWith('http://')) {
+      clean = clean.replace(/^http:\/\//i, 'https://');
+    }
+    return clean.endsWith('/api') ? clean : `${clean}/api`;
+  }
+
+  // 2. Production HTTPS: ALWAYS use relative '/api' (handled by vercel.json rewrites)
+  if (window.location.protocol === 'https:') {
+    return '/api';
+  }
+
+  // 3. Local HTTP Development only (localhost / 127.0.0.1)
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]';
+  if (isLocal) {
+    if (window.location.port === '3000' || window.location.port === '5000') {
+      return '/api';
+    }
     return `http://${window.location.hostname}:5000/api`;
   }
+
   return '/api';
 }
 
@@ -39,9 +56,13 @@ export async function apiRequest(endpoint, options = {}) {
       ...options,
       headers
     });
-    // If primary returned 404 (e.g. dev server without API proxy or proxy hiccup), try direct port 5000 fallback
-    if (response.status === 404 && typeof window !== 'undefined' && !primaryUrl.includes(':5000')) {
-      const fallbackUrl = `http://${window.location.hostname || '127.0.0.1'}:5000/api${endpoint}`;
+    // Local development only: if relative /api returned 404, fallback to direct 127.0.0.1:5000 (never on HTTPS)
+    const isLocalHttp = typeof window !== 'undefined' && 
+      window.location.protocol === 'http:' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    if (response.status === 404 && isLocalHttp && !primaryUrl.includes(':5000')) {
+      const fallbackUrl = `http://127.0.0.1:5000/api${endpoint}`;
       try {
         const fallbackRes = await fetch(fallbackUrl, { ...options, headers });
         if (fallbackRes.ok || fallbackRes.status !== 404) {
@@ -52,16 +73,19 @@ export async function apiRequest(endpoint, options = {}) {
       }
     }
   } catch (networkErr) {
-    // If network error and not already using port 5000, try direct 5000 fallback
-    if (typeof window !== 'undefined' && !primaryUrl.includes(':5000')) {
+    const isLocalHttp = typeof window !== 'undefined' && 
+      window.location.protocol === 'http:' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    if (isLocalHttp && !primaryUrl.includes(':5000')) {
       try {
-        const fallbackUrl = `http://${window.location.hostname || '127.0.0.1'}:5000/api${endpoint}`;
+        const fallbackUrl = `http://127.0.0.1:5000/api${endpoint}`;
         response = await fetch(fallbackUrl, { ...options, headers });
       } catch (fallbackErr) {
-        throw new Error('Server connection error. Please ensure backend server on port 5000 is running.');
+        throw new Error('Server connection error. Please ensure backend server is running on port 5000.');
       }
     } else {
-      throw new Error('Server connection error. Please ensure backend server on port 5000 is running.');
+      throw new Error('Server connection error. Please check your internet connection or verify the backend service is running.');
     }
   }
 

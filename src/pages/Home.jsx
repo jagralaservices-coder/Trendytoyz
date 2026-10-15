@@ -12,31 +12,50 @@ export default function Home() {
   const [toysList, setToysList] = useState([]);
   const [walletsList, setWalletsList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const loadHomeData = async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const results = await Promise.allSettled([
+        api.getBanners(),
+        api.getProducts({ featured: 'true', limit: 8 }),
+        api.getProducts({ bestSeller: 'true', limit: 8 }),
+        api.getProducts({ newArrival: 'true', limit: 8 }),
+        api.getProducts({ limit: 12 })
+      ]);
+
+      const banRes = results[0].status === 'fulfilled' ? results[0].value : { success: false, banners: [] };
+      const featRes = results[1].status === 'fulfilled' ? results[1].value : { success: false, products: [] };
+      const bestRes = results[2].status === 'fulfilled' ? results[2].value : { success: false, products: [] };
+      const newRes = results[3].status === 'fulfilled' ? results[3].value : { success: false, products: [] };
+      const allRes = results[4].status === 'fulfilled' ? results[4].value : { success: false, products: [] };
+
+      if (banRes.success && Array.isArray(banRes.banners)) {
+        setBanners(banRes.banners);
+      }
+      
+      const catalogProducts = allRes.success && Array.isArray(allRes.products) ? allRes.products : [];
+      setFeaturedProducts(featRes.success && Array.isArray(featRes.products) && featRes.products.length > 0 ? featRes.products : catalogProducts.slice(0, 4));
+      setBestSellers(bestRes.success && Array.isArray(bestRes.products) && bestRes.products.length > 0 ? bestRes.products : catalogProducts.slice(4, 8));
+      setNewArrivals(newRes.success && Array.isArray(newRes.products) && newRes.products.length > 0 ? newRes.products : catalogProducts.slice(0, 8));
+      setToysList(catalogProducts);
+      setWalletsList(catalogProducts.filter(p => p.category_name?.toLowerCase().includes('wallet') || p.subcategory?.toLowerCase().includes('wallet')));
+
+      // If all product endpoints failed
+      if (!allRes.success && !featRes.success && !bestRes.success) {
+        setLoadError(true);
+      }
+    } catch (err) {
+      console.warn('Notice: Homepage catalog data pending or sleeping:', err.message || err);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadHomeData() {
-      try {
-        const [banRes, featRes, bestRes, newRes, allRes] = await Promise.all([
-          api.getBanners(),
-          api.getProducts({ featured: 'true', limit: 8 }),
-          api.getProducts({ bestSeller: 'true', limit: 8 }),
-          api.getProducts({ newArrival: 'true', limit: 8 }),
-          api.getProducts({ limit: 12 })
-        ]);
-
-        if (banRes.success) setBanners(banRes.banners);
-        const catalogProducts = allRes.success ? allRes.products : [];
-        setFeaturedProducts(featRes.success && featRes.products.length > 0 ? featRes.products : catalogProducts.slice(0, 4));
-        setBestSellers(bestRes.success && bestRes.products.length > 0 ? bestRes.products : catalogProducts.slice(4, 8));
-        setNewArrivals(newRes.success && newRes.products.length > 0 ? newRes.products : catalogProducts.slice(0, 8));
-        setToysList(catalogProducts);
-        setWalletsList(catalogProducts.filter(p => p.category_name?.toLowerCase().includes('wallet') || p.subcategory?.toLowerCase().includes('wallet')));
-      } catch (err) {
-        console.error('Error loading homepage data:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadHomeData();
   }, []);
 
@@ -164,6 +183,28 @@ export default function Home() {
           </Link>
         </div>
       </section>
+
+      {/* Backend Connecting / Loading Fallback Banner */}
+      {loadError && featuredProducts.length === 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="bg-sky-50 border border-sky-200 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-xs">
+            <div className="w-12 h-12 bg-sky-100 text-sky-700 rounded-2xl flex items-center justify-center mx-auto">
+              <Sparkles className="w-6 h-6 text-sky-600 animate-pulse" />
+            </div>
+            <h3 className="text-lg font-black text-slate-900">Connecting to TRENDYTOYZ Cloud Services...</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Backend service se catalog sync ho raha hai. Agar products load na hon, toh kripya thodi der baad Refresh karein.
+            </p>
+            <button
+              onClick={loadHomeData}
+              className="bg-navy-gradient hover:bg-slate-800 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-md inline-flex items-center gap-2"
+            >
+              <span>Refresh Catalog</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Featured Products */}
       {featuredProducts.length > 0 && (

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="toyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="50%" stop-color="#0369a1" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+  </defs>
+  <!-- Background Rounded Shield -->
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#toyGrad)" />
+  <!-- Border Highlight -->
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="none" stroke="#38bdf8" stroke-width="2" stroke-opacity="0.4" />
+  
+  <!-- Stylized Toy / Building Block Motif -->
+  <!-- Top Studs -->
+  <circle cx="24" cy="18" r="4" fill="#38bdf8" />
+  <circle cx="40" cy="18" r="4" fill="#38bdf8" />
+  
+  <!-- Main Block Base -->
+  <rect x="16" y="22" width="32" height="26" rx="6" fill="#ffffff" />
+  
+  <!-- "TT" Monogram cut into the block -->
+  <path d="M22 28 H30 M26 28 V42" stroke="#0369a1" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M34 28 H42 M38 28 V42" stroke="#0284c7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Star Sparkle -->
+  <path d="M48 12 L49.5 16 L53.5 17.5 L49.5 19 L48 23 L46.5 19 L42.5 17.5 L46.5 16 Z" fill="#fbbf24" />
+</svg>

@@ -12,8 +12,40 @@ const PORT = process.env.PORT || 5000;
 // Initialize Database
 require('./db');
 
-// Middleware
-app.use(cors());
+// CORS Configuration (Allow Vercel frontend, custom domains, and local dev)
+const allowedOrigins = [
+  'https://trendytoyz.vercel.app',
+  'https://trendytoyz.com',
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5000'
+];
+
+if (process.env.CLIENT_URL) {
+  process.env.CLIENT_URL.split(',').forEach(u => {
+    const clean = u.trim().replace(/\/+$/, '');
+    if (clean && !allowedOrigins.includes(clean)) allowedOrigins.push(clean);
+  });
+}
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (origin.endsWith('.vercel.app') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    // Allow for development / other domains
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -67,8 +99,8 @@ app.use((req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`===================================================`);
-  console.log(`🚀 TRENDYTOYZ Server running on http://localhost:${PORT}`);
+  console.log(`🚀 TRENDYTOYZ Server running on http://0.0.0.0:${PORT}`);
   console.log(`===================================================`);
 });
